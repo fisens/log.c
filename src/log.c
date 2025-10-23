@@ -131,10 +131,10 @@ int log_add_fp(FILE *fp, int level) {
 }
 
 
-static void init_event(log_Event *ev, void *udata) {
+static void init_event(log_Event *ev, void *udata, struct tm* time_buf) {
   if (!ev->time) {
     time_t t = time(NULL);
-    ev->time = localtime(&t);
+    ev->time = gmtime_r(&t, time_buf);
   }
   ev->udata = udata;
 }
@@ -148,10 +148,12 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
     .level = level,
   };
 
+  struct tm time_buf;
+
   lock();
 
   if (!L.quiet && level >= L.level) {
-    init_event(&ev, stderr);
+    init_event(&ev, stderr, &time_buf);
     va_start(ev.ap, fmt);
     stdout_callback(&ev);
     va_end(ev.ap);
@@ -160,7 +162,7 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
   for (int i = 0; i < MAX_CALLBACKS && L.callbacks[i].fn; i++) {
     Callback *cb = &L.callbacks[i];
     if (level >= cb->level) {
-      init_event(&ev, cb->udata);
+      init_event(&ev, cb->udata, &time_buf);
       va_start(ev.ap, fmt);
       cb->fn(&ev);
       va_end(ev.ap);
